@@ -1,0 +1,57 @@
+services:
+  # Web service (FastAPI)
+  - type: web
+    name: hf-dabby-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn fastapi_app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: hf-dabby-redis
+          type: redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Gradio interface
+  - type: web
+    name: hf-dabby-gradio
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: hf-dabby-redis
+          type: redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GRADIO_PORT
+        value: $PORT
+    autoDeploy: true
+
+  # Redis instance
+  - type: redis
+    name: hf-dabby-redis
+    ipAllowList: []
+    plan: free
+
+  # Celery worker
+  - type: worker
+    name: hf-dabby-worker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_config worker --loglevel=info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: hf-dabby-redis
+          type: redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+    autoDeploy: true
